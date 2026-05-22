@@ -444,6 +444,15 @@ def locate_file(
         )
 
     fmeta = files_metadata[key]
+    
+    if fmeta["status"] != "committed":
+
+        raise HTTPException(
+            status_code=409,
+            detail="El archivo aún no está completamente subido"
+        )
+
+    active = get_active_nodes()
 
     active = get_active_nodes()
 
