@@ -1,0 +1,108 @@
+version: '3.8'
+
+networks:
+  dfs_net:
+    driver: bridge
+
+volumes:
+  namenode_data:
+  dn1_blocks:
+  dn2_blocks:
+  dn3_blocks:
+
+services:
+
+  namenode:
+    build: ./namenode
+    container_name: namenode
+    hostname: namenode
+    ports:
+      - "5000:5000"
+    volumes:
+      - namenode_data:/data
+    environment:
+      - REPLICATION_FACTOR=2
+      - CHUNK_SIZE_MB=64
+      - HEARTBEAT_TIMEOUT=15
+      - JWT_SECRET=dfs-secret-2025
+    networks:
+      - dfs_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  datanode-1:
+    build: ./datanode
+    container_name: datanode-1
+    hostname: datanode-1
+    ports:
+      - "5001:5001"
+    volumes:
+      - dn1_blocks:/app/blocks
+    environment:
+      - NODE_ID=datanode-1
+      - NODE_PORT=5001
+      - NODE_ADDR=datanode-1:5001
+      - NAMENODE_URL=http://namenode:5000
+    networks:
+      - dfs_net
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  datanode-2:
+    build: ./datanode
+    container_name: datanode-2
+    hostname: datanode-2
+    ports:
+      - "5002:5001"
+    volumes:
+      - dn2_blocks:/app/blocks
+    environment:
+      - NODE_ID=datanode-2
+      - NODE_PORT=5001
+      - NODE_ADDR=datanode-2:5001
+      - NAMENODE_URL=http://namenode:5000
+    networks:
+      - dfs_net
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  datanode-3:
+    build: ./datanode
+    container_name: datanode-3
+    hostname: datanode-3
+    ports:
+      - "5003:5001"
+    volumes:
+      - dn3_blocks:/app/blocks
+    environment:
+      - NODE_ID=datanode-3
+      - NODE_PORT=5001
+      - NODE_ADDR=datanode-3:5001
+      - NAMENODE_URL=http://namenode:5000
+    networks:
+      - dfs_net
+    depends_on:
+      namenode:
+        condition: service_healthy
+
+  client:
+    build: ./client
+    container_name: dfs-client
+    volumes:
+      - ./uploads:/uploads
+      - ./downloads:/downloads
+    environment:
+      - NAMENODE_URL=http://namenode:5000
+      - CHUNK_SIZE_MB=64
+    networks:
+      - dfs_net
+    depends_on:
+      - namenode
+    stdin_open: true
+    tty: true
+    entrypoint: ["tail", "-f", "/dev/null"]
