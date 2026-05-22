@@ -1,0 +1,54 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ── Entornos virtuales ────────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# ── Variables de entorno (nunca subir credenciales) ───────────────────────────
+.env
+.env.local
+.env.production
+
+# ── Token del cliente DFS ─────────────────────────────────────────────────────
+.dfs_token
+
+# ── Bloques y datos de los nodos (pueden ser GBs) ────────────────────────────
+namenode/blocks/
+datanode/blocks/
+blocks/
+volumes/
+*.block
+
+# ── Archivos de prueba generados ─────────────────────────────────────────────
+uploads/
+downloads/
+*.bin
+test_*.txt
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+.docker/
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
