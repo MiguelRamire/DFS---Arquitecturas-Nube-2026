@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 import os, hashlib, httpx, threading, time
 
 app = FastAPI(title="DataNode DFS")
@@ -111,8 +111,8 @@ async def store_block(block_id: str, request: Request, replicate_to: str = ""):
                 r = await client.put(
                     f"http://{next_node}/blocks/{block_id}",
                     content=data,
-                    params={"replicate_to": remaining} if remaining else {},
                     headers={"Content-Type": "application/octet-stream"},
+                    params={"replicate_to": remaining} if remaining else {},
                     timeout=30
                 )
             print(f"[{NODE_ID}] Replicado en {next_node} → {r.status_code}")
@@ -123,12 +123,24 @@ async def store_block(block_id: str, request: Request, replicate_to: str = ""):
 
 @app.get("/blocks/{block_id}")
 def get_block(block_id: str):
-    """Devuelve los bytes del bloque solicitado."""
+
     path = block_path(block_id)
+
     if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail=f"Bloque {block_id} no encontrado")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Bloque {block_id} no encontrado"
+        )
+
     print(f"[{NODE_ID}] Sirviendo: {block_id}")
-    return FileResponse(path, media_type="application/octet-stream", filename=block_id)
+
+    with open(path, "rb") as f:
+        data = f.read()
+
+    return Response(
+        content=data,
+        media_type="application/octet-stream"
+    )
 
 @app.delete("/blocks/{block_id}")
 def delete_block(block_id: str):
