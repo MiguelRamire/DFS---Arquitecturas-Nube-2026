@@ -1,337 +1,335 @@
 # DFS — Sistema de Archivos Distribuidos por Bloques
 
-Sistema de archivos distribuido minimalista inspirado en HDFS/GFS, desarrollado para la materia **Arquitecturas de Nube y Sistemas Distribuidos** — UPB 2026.
+Sistema de archivos distribuido inspirado en HDFS/GFS, desarrollado para la materia
+**Arquitecturas de Nube y Sistemas Distribuidos — UPB 2026**.
 
-Permite subir y descargar archivos grandes dividiéndolos en bloques y distribuyéndolos entre múltiples nodos (DataNodes), con un nodo central de metadatos (NameNode) y replicación mínima de 2 copias por bloque.
-
----
-
-## Estructura del proyecto
-
-```
-dfs-project/
-├── namenode/
-│   ├── namenode.py          # Servidor central de metadatos + autenticación JWT
-│   ├── requirements.txt     # fastapi, uvicorn, pydantic, PyJWT
-│   └── Dockerfile
-├── datanode/
-│   ├── datanode.py          # Almacenamiento de bloques + heartbeat + replicación
-│   ├── requirements.txt     # fastapi, uvicorn, httpx
-│   └── Dockerfile
-├── client/
-│   ├── client.py            # CLI: login, put, get, ls, rm, mkdir, rmdir, status
-│   └── requirements.txt     # httpx
-├── docker-compose.yml       # Orquesta todo el clúster
-├── .gitignore
-└── README.md
-```
+El sistema divide archivos en bloques, los replica en múltiples DataNodes y mantiene
+los metadatos en un NameNode central. Incluye tolerancia a fallos, autenticación JWT
+y un cliente CLI completo.
 
 ---
 
-## Requisitos previos
+## Arquitectura general
 
-- Python 3.11 o superior → https://www.python.org/downloads/
-- Docker Desktop (para correr con Docker) → https://www.docker.com/products/docker-desktop/
+| Componente | Rol |
+|---|---|
+| **NameNode** | Servidor central de metadatos, autenticación, ubicación de bloques y estado del clúster |
+| **DataNodes** | Almacenan bloques físicos, envían heartbeats y replican datos en cadena |
+| **Cliente** | CLI para interactuar con el DFS (`login`, `put`, `get`, `ls`, `rm`, `mkdir`, `rmdir`, `status`) |
+| **Docker Compose** | Orquesta todo el sistema con un solo comando |
+
+---
+
+## Requisitos
+
+- Docker Desktop instalado y **corriendo** → https://www.docker.com/products/docker-desktop/
 - Git → https://git-scm.com/
+- Windows / Linux / macOS
 
-Verificar que estén instalados:
+Verificar instalación:
 
 ```bash
-python --version
 docker --version
 git --version
 ```
 
 ---
 
-## Opción A — Correr en local (Windows, sin Docker)
+## IMPORTANTE — Todos los comandos del cliente requieren `-it`
 
-Esta opción es la más rápida para desarrollo y pruebas.
-Se abren **4 terminales** en VS Code (una por componente).
+El cliente pide usuario y contraseña de forma interactiva al ejecutarse.
+Por eso **todos los comandos con `docker exec` deben incluir `-it`**, sin excepción.
+
+Sin `-it`, Docker no asigna entrada interactiva y el comando falla con:
+```
+EOFError: EOF when reading a line
+```
+
+**Forma correcta — siempre con `-it`:**
+```bash
+docker exec -it dfs-client python client.py put /uploads/archivo.txt
+```
+
+**Forma incorrecta — falla:**
+```bash
+docker exec dfs-client python client.py put /uploads/archivo.txt
+```
+
+Esto aplica a `put`, `get`, `ls`, `rm`, `mkdir`, `rmdir` y `status`.
+El sistema está diseñado así para garantizar que cada operación sea autenticada.
+
+---
+
+## Ejecutar el sistema
 
 ### Paso 1 — Clonar el repositorio
 
 ```bash
-git clone https://github.com/tu-usuario/dfs-project.git
-cd dfs-project
+git clone git clone https://github.com/MiguelRamire/DFS---Arquitecturas-Nube-2026.git
+cd DFS---Arquitecturas-Nube-2026
 ```
 
-### Paso 2 — Instalar dependencias del NameNode
+### Paso 2 — Crear las carpetas de archivos
 
 ```bash
-cd namenode
-pip install -r requirements.txt
+mkdir uploads downloads
 ```
 
-Dependencias que instala:
-- `fastapi` — framework REST
-- `uvicorn` — servidor ASGI
-- `pydantic` — validación de datos
-- `PyJWT` — generación y verificación de tokens JWT
+- `uploads/` → aquí van los archivos que se van a subir al DFS
+- `downloads/` → aquí aparecen los archivos descargados desde el DFS
 
-### Paso 3 — Arrancar el NameNode (Terminal 1)
+### Paso 3 — Levantar el clúster
 
 ```bash
-cd namenode
-python -m uvicorn namenode:app --host 0.0.0.0 --port 5000
-```
-
-Verificar que funciona:
-```bash
-# En otra terminal (o en el navegador)
-curl http://localhost:5000/health
-# Respuesta esperada: {"status":"alive","role":"namenode",...}
-```
-
-La documentación interactiva de la API queda en: http://localhost:5000/docs
-
-### Paso 4 — Instalar dependencias del DataNode
-
-```bash
-cd datanode
-pip install -r requirements.txt
-```
-
-Dependencias que instala:
-- `fastapi` + `uvicorn` — igual que el NameNode
-- `httpx` — cliente HTTP para registrarse y enviar heartbeats al NameNode
-
-### Paso 5 — Arrancar DataNode 1 (Terminal 2)
-
-En Windows se usan `set` para las variables de entorno:
-
-```bash
-cd datanode
-
-set NODE_ID=datanode-1
-set NODE_PORT=5001
-set NODE_ADDR=localhost:5001
-set NAMENODE_URL=http://localhost:5000
-
-python -m uvicorn datanode:app --host 0.0.0.0 --port 5001
-```
-
-Deberías ver en la consola:
-```
-[datanode-1] Registrado en NameNode correctamente.
-```
-
-### Paso 6 — Arrancar DataNode 2 (Terminal 3)
-
-```bash
-cd datanode
-
-set NODE_ID=datanode-2
-set NODE_PORT=5002
-set NODE_ADDR=localhost:5002
-set NAMENODE_URL=http://localhost:5000
-
-python -m uvicorn datanode:app --host 0.0.0.0 --port 5002
-```
-
-### Paso 7 — Instalar dependencias del cliente
-
-```bash
-cd client
-pip install -r requirements.txt
-```
-
-### Paso 8 — Usar el cliente (Terminal 4)
-
-```bash
-cd client
-set NAMENODE_URL=http://localhost:5000
-```
-
-#### Iniciar sesión
-
-```bash
-python client.py login alice password123
-```
-
-Usuarios disponibles por defecto:
-| Usuario | Contraseña |
-|---------|-----------|
-| alice   | password123 |
-| bob     | password456 |
-| admin   | admin |
-
-#### Verificar estado del clúster
-
-```bash
-python client.py status
-```
-
-Respuesta esperada:
-```
-Nodo                  Vivo  Bloques   Libre (MB)    Últ. HB
-------------------------------------------------------------
-datanode-1            True        0      50000.0         2s
-datanode-2            True        0      50000.0         1s
-```
-
-#### Subir un archivo
-
-```bash
-# Crear archivo de prueba (1 MB)
-python -c "open('test.bin','wb').write(b'x'*1024*1024)"
-
-# Subirlo al DFS
-python client.py put test.bin
-```
-
-#### Listar archivos
-
-```bash
-python client.py ls
-```
-
-#### Descargar un archivo
-
-```bash
-python client.py get test.bin test_descargado.bin
-```
-
-#### Verificar integridad (los hashes deben ser iguales)
-
-```bash
-# PowerShell
-Get-FileHash test.bin -Algorithm MD5
-Get-FileHash test_descargado.bin -Algorithm MD5
-
-# O con Python
-python -c "import hashlib; print(hashlib.md5(open('test.bin','rb').read()).hexdigest())"
-python -c "import hashlib; print(hashlib.md5(open('test_descargado.bin','rb').read()).hexdigest())"
-```
-
-#### Crear y eliminar directorios
-
-```bash
-python client.py mkdir documentos
-python client.py rmdir documentos
-```
-
-#### Eliminar un archivo
-
-```bash
-python client.py rm test.bin
-python client.py ls
-# test.bin ya no debe aparecer
-```
-
----
-
-## Opción B — Correr con Docker Compose
-
-Esta opción levanta todo el clúster con un solo comando.
-Requiere Docker Desktop instalado y corriendo.
-
-### Paso 1 — Construir y levantar el clúster
-
-```bash
-# Desde la raíz del proyecto
 docker compose up --build
 ```
 
 Esto construye las imágenes y arranca: NameNode + DataNode 1 + DataNode 2 + DataNode 3 + Cliente.
 
-Verificar que todos los contenedores están corriendo:
+Verificar que todos los contenedores estén corriendo:
 
 ```bash
 docker compose ps
 ```
 
-### Paso 2 — Usar el cliente dentro del contenedor
+Todos deben aparecer con estado `running`.
+
+---
+
+## Pruebas del sistema paso a paso
+
+### Prueba 1 — Verificar estado del clúster
 
 ```bash
-# Iniciar sesión
-docker exec dfs-client python client.py login alice password123
-
-# Ver estado del clúster
-docker exec dfs-client python client.py status
-
-# Subir un archivo (debe estar en la carpeta uploads/ del proyecto)
-docker exec dfs-client python client.py put /uploads/test.bin
-
-# Listar archivos
-docker exec dfs-client python client.py ls
-
-# Descargar
-docker exec dfs-client python client.py get test.bin /downloads/test_recuperado.bin
-
-# Verificar integridad
-docker exec dfs-client python -c "
-import hashlib
-h1 = hashlib.md5(open('/uploads/test.bin','rb').read()).hexdigest()
-h2 = hashlib.md5(open('/downloads/test_recuperado.bin','rb').read()).hexdigest()
-print('Original: ', h1)
-print('Recuperado:', h2)
-print('Integridad OK:', h1 == h2)
-"
+curl http://localhost:5000/datanodes/status
 ```
 
-### Paso 3 — Probar tolerancia a fallos
+Resultado esperado: los tres DataNodes con `"alive": true`.
+
+---
+
+### Prueba 2 — Subir un archivo pequeño (1 MB)
+
+**Crear el archivo de prueba:**
+
+Windows (PowerShell):
+```powershell
+fsutil file createnew uploads\test_1mb.bin 1048576
+```
+
+Linux / Mac:
+```bash
+dd if=/dev/zero of=uploads/test_1mb.bin bs=1M count=1
+```
+
+**Subir al DFS** (el sistema pedirá usuario y contraseña):
 
 ```bash
-# Ver estado inicial
-docker exec dfs-client python client.py status
+docker exec -it dfs-client python client.py put /uploads/test_1mb.bin
+```
 
-# Simular caída de datanode-2
+Cuando aparezca el prompt:
+```
+=== DFS LOGIN ===
+Usuario: alice
+Contraseña: password123
+```
+
+El sistema autentica, divide el archivo en bloques y los distribuye entre los DataNodes.
+
+---
+
+### Prueba 3 — Listar archivos
+
+```bash
+docker exec -it dfs-client python client.py ls
+```
+
+Debe aparecer `test_1mb.bin` con su tamaño y número de bloques.
+
+---
+
+### Prueba 4 — Descargar y verificar integridad
+
+**Descargar el archivo:**
+
+```bash
+docker exec -it dfs-client python client.py get test_1mb.bin /downloads/test_1mb_recuperado.bin
+```
+
+**Verificar que el archivo descargado es idéntico al original (MD5):**
+
+Windows (PowerShell):
+```powershell
+certutil -hashfile uploads\test_1mb.bin MD5
+certutil -hashfile downloads\test_1mb_recuperado.bin MD5
+```
+
+Linux / Mac:
+```bash
+md5sum uploads/test_1mb.bin
+md5sum downloads/test_1mb_recuperado.bin
+```
+
+Los dos hashes deben ser exactamente iguales. Si coinciden, la integridad está garantizada.
+
+---
+
+### Prueba 5 — Tolerancia a fallos (caída de un DataNode)
+
+**Ver estado inicial:**
+
+```bash
+curl http://localhost:5000/datanodes/status
+```
+
+**Simular caída del DataNode 2:**
+
+```bash
 docker stop datanode-2
+```
 
-# Esperar 15 segundos (timeout del heartbeat)
-# Verificar que el NameNode lo detectó
-docker exec dfs-client python client.py status
-# datanode-2 debe aparecer como: Vivo = False
+**Esperar unos segundos y consultar el estado:**
 
-# El archivo debe seguir siendo descargable gracias a la réplica en datanode-1
-docker exec dfs-client python client.py get test.bin /downloads/test_failover.bin
+```bash
+curl http://localhost:5000/datanodes/status
+```
 
-# Restaurar el nodo
+`datanode-2` debe aparecer con `"alive": false`.
+
+**Intentar descargar el archivo con el nodo caído:**
+
+```bash
+docker exec -it dfs-client python client.py get test_1mb.bin /downloads/test_failover.bin
+```
+
+El archivo sigue siendo accesible gracias a la réplica en los otros DataNodes.
+Verificar integridad nuevamente con MD5 — debe coincidir.
+
+**Restaurar el DataNode:**
+
+```bash
 docker start datanode-2
-# Esperar 10 segundos y verificar que volvió a alive = True
-docker exec dfs-client python client.py status
 ```
 
-### Paso 4 — Ver logs de un nodo específico
+Después de unos segundos vuelve a aparecer como `"alive": true`.
 
-```bash
-docker logs namenode
-docker logs datanode-1
-docker logs datanode-2
+---
+
+### Prueba 6 — Archivo grande (200 MB, múltiples bloques)
+
+**Crear archivo de 200 MB:**
+
+Windows (PowerShell):
+```powershell
+fsutil file createnew uploads\test_200mb.bin 209715200
 ```
 
-### Paso 5 — Apagar el clúster
+Linux / Mac:
+```bash
+dd if=/dev/zero of=uploads/test_200mb.bin bs=1M count=200
+```
+
+**Subir al DFS:**
 
 ```bash
+docker exec -it dfs-client python client.py put /uploads/test_200mb.bin
+```
+
+El sistema lo divide automáticamente en múltiples bloques de 64 MB y los distribuye entre los DataNodes.
+
+**Descargar y verificar integridad:**
+
+```bash
+docker exec -it dfs-client python client.py get test_200mb.bin /downloads/test_200mb_recuperado.bin
+```
+
+Windows:
+```powershell
+certutil -hashfile uploads\test_200mb.bin MD5
+certutil -hashfile downloads\test_200mb_recuperado.bin MD5
+```
+
+---
+
+### Prueba 7 — Crear y eliminar directorios
+
+```bash
+docker exec -it dfs-client python client.py mkdir documentos
+docker exec -it dfs-client python client.py ls
+docker exec -it dfs-client python client.py rmdir documentos
+```
+
+---
+
+### Prueba 8 — Eliminar un archivo
+
+```bash
+docker exec -it dfs-client python client.py rm test_1mb.bin
+docker exec -it dfs-client python client.py ls
+```
+
+`test_1mb.bin` ya no debe aparecer en la lista.
+
+---
+
+### Prueba 9 — Ver estado del clúster desde el cliente
+
+```bash
+docker exec -it dfs-client python client.py status
+```
+
+Muestra una tabla con todos los DataNodes, si están vivos, cuántos bloques tienen y cuánto espacio libre.
+
+---
+
+## Apagar el sistema
+
+```bash
+# Apagar los contenedores (los datos se conservan)
 docker compose down
-# Para también borrar los volúmenes (bloques guardados):
+
+# Apagar y borrar todos los datos almacenados
 docker compose down -v
 ```
 
 ---
 
+## Usuarios disponibles
+
+| Usuario | Contraseña  |
+|---------|-------------|
+| alice   | password123 |
+| bob     | password456 |
+| admin   | admin       |
+
+Para agregar usuarios, editar el diccionario `USERS` en `namenode/namenode.py`.
+
+---
+
 ## API REST — Referencia rápida
 
-Una vez corriendo, la documentación interactiva está disponible en:
+La documentación interactiva (Swagger) está disponible mientras el sistema corre:
+
 - NameNode: http://localhost:5000/docs
 - DataNode 1: http://localhost:5001/docs
 - DataNode 2: http://localhost:5002/docs
+- DataNode 3: http://localhost:5003/docs
 
 ### Endpoints del NameNode
 
 | Método | Endpoint | Auth | Descripción |
 |--------|----------|------|-------------|
 | POST | `/auth/login` | No | Autenticación. Retorna token JWT |
-| POST | `/files/upload_plan` | Sí | Solicita plan de bloques antes de subir |
+| POST | `/files/upload_plan` | Sí | Plan de bloques antes de subir |
 | POST | `/files/commit` | Sí | Confirma que todos los bloques fueron subidos |
-| GET | `/files/{nombre}/locate` | Sí | Retorna ubicación de bloques para descargar |
+| GET | `/files/{nombre}/locate` | Sí | Ubicación de bloques para descargar |
 | GET | `/files` | Sí | Lista archivos del usuario autenticado |
 | DELETE | `/files/{nombre}` | Sí | Elimina un archivo |
 | POST | `/dirs/mkdir` | Sí | Crea un directorio |
 | DELETE | `/dirs/rmdir/{ruta}` | Sí | Elimina un directorio vacío |
-| POST | `/datanodes/register` | No | Un DataNode se registra al arrancar |
-| POST | `/datanodes/heartbeat` | No | Heartbeat periódico de un DataNode |
+| POST | `/datanodes/register` | No | Registro de un DataNode al arrancar |
+| POST | `/datanodes/heartbeat` | No | Heartbeat periódico del DataNode |
 | GET | `/datanodes/status` | No | Estado del clúster |
 | GET | `/health` | No | Health check |
 
@@ -339,7 +337,7 @@ Una vez corriendo, la documentación interactiva está disponible en:
 
 | Método | Endpoint | Descripción |
 |--------|----------|-------------|
-| PUT | `/blocks/{id}` | Recibe y almacena un bloque (body: bytes) |
+| PUT | `/blocks/{id}` | Recibe y almacena un bloque (bytes) |
 | GET | `/blocks/{id}` | Devuelve los bytes de un bloque |
 | DELETE | `/blocks/{id}` | Elimina un bloque |
 | GET | `/blocks` | Lista todos los bloques del nodo |
@@ -349,57 +347,41 @@ Una vez corriendo, la documentación interactiva está disponible en:
 
 ## Solución de problemas comunes
 
-### `AttributeError: module 'os' has no attribute 'statvfs'`
+### `EOFError: EOF when reading a line`
 
-Este error ocurre en Windows. Está corregido en la versión actual del `datanode.py`.
-Si lo ves, asegúrate de tener la versión más reciente:
+Falta el `-it` en el comando. Todos los comandos del cliente requieren modo interactivo porque piden usuario y contraseña. Solución:
 
 ```bash
-git pull
-```
-
-### El DataNode no puede conectarse al NameNode
-
-Verificar que el NameNode esté corriendo:
-```bash
-curl http://localhost:5000/health
-```
-
-Verificar que la variable `NAMENODE_URL` esté bien configurada:
-```bash
-# Windows
-echo %NAMENODE_URL%
-
-# Si está vacía, configurarla:
-set NAMENODE_URL=http://localhost:5000
-```
-
-### `Token inválido o expirado`
-
-El token dura 1 hora. Volver a iniciar sesión:
-```bash
-python client.py login alice password123
+# Agregar -it siempre
+docker exec -it dfs-client python client.py <comando>
 ```
 
 ### `507 Insufficient Storage — Se necesitan 2 DataNodes activos`
 
-El NameNode necesita al menos 2 DataNodes registrados y activos para almacenar un bloque con replicación. Verificar que ambos DataNodes estén corriendo:
+El NameNode necesita mínimo 2 DataNodes activos para garantizar la replicación. Verificar:
 
 ```bash
-python client.py status
+docker compose ps
+curl http://localhost:5000/datanodes/status
 ```
 
----
+### El DataNode no aparece como activo
 
-## Usuarios disponibles
+Puede que no haya terminado de registrarse. Esperar 10 segundos y volver a consultar el estado. Si sigue sin aparecer, revisar los logs:
 
-| Usuario | Contraseña | Nota |
-|---------|-----------|------|
-| alice   | password123 | Usuario de prueba |
-| bob     | password456 | Usuario de prueba |
-| admin   | admin | Administrador |
+```bash
+docker logs datanode-1
+```
 
-Para agregar usuarios, editar el diccionario `USERS` en `namenode/namenode.py`.
+### Ver logs de cualquier componente
+
+```bash
+docker logs namenode
+docker logs datanode-1
+docker logs datanode-2
+docker logs datanode-3
+docker logs dfs-client
+```
 
 ---
 
@@ -407,26 +389,44 @@ Para agregar usuarios, editar el diccionario `USERS` en `namenode/namenode.py`.
 
 | Componente | Tecnología | Por qué |
 |-----------|-----------|---------|
-| Lenguaje | Python 3.11 | Rápido de prototipar, ecosistema maduro |
+| Lenguaje | Python 3.11 | Ecosistema maduro, fácil de prototipar |
 | Framework HTTP | FastAPI | Async, Swagger automático, validación con Pydantic |
-| Servidor | Uvicorn | ASGI, compatible con FastAPI async |
+| Servidor | Uvicorn | ASGI, compatible con FastAPI |
 | Cliente HTTP | httpx | Soporte async/sync, compatible con Windows |
 | Autenticación | PyJWT | Sin estado, estándar de la industria |
-| Orquestación | Docker Compose v3.8 | Simple, reproducible |
+| Orquestación | Docker Compose v3.8 | Simple y reproducible |
+
+---
+
+## Despliegue en AWS Academy
+
+> **Sección pendiente — por completar por Juan José Ramírez Zuluaga**
+
+Esta sección describe cómo desplegar el sistema en máquinas virtuales EC2 de AWS Academy,
+de modo que los nodos se comuniquen por Internet en vez de por red local Docker.
+
+Los puntos a documentar son:
+
+- Configuración de instancias EC2 (tipo, región, AMI usada)
+- Instalación de Docker en cada VM
+- Configuración de Security Groups (puertos a abrir por nodo)
+- Variables de entorno a cambiar para apuntar a IPs públicas o privadas de la VPC
+- Comandos para levantar cada nodo en su VM correspondiente
+- Verificación de que los nodos se comunican correctamente por Internet
 
 ---
 
 ## Integrantes
 
-| Persona | Componente | Responsabilidad |
-|---------|-----------|----------------|
-| Persona 1 | NameNode | namenode.py + JWT + mkdir/rmdir + secciones 1 y 3 del informe grupal |
-| Persona 2 | DataNode | datanode.py + replicación en cadena + secciones 5 y 6 del informe grupal |
-| Persona 3 | Cliente + Docker | client.py + docker-compose.yml + pruebas + secciones 4 y 7 del informe grupal |
+| Integrante | Componente |
+|-----------|-----------|
+| Juan Felipe Cano Noreña | NameNode + AWS |
+| Miguel Ángel Ramírez Velásquez | DataNode |
+| Juan José Ramírez Zuluaga | Cliente |
 
 ---
 
-## Repositorio y gestión de tareas
+## Gestión del proyecto
 
-- Tablero Trello: [enlace al tablero]
-- Repositorio GitHub: [enlace al repo]
+- Tablero Trello: https://trello.com/b/2UHm3jxM/dfs-arquitecturas-nube-2026
+- Repositorio GitHub: https://github.com/MiguelRamire/DFS---Arquitecturas-Nube-2026
