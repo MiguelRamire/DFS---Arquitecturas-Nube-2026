@@ -5,7 +5,6 @@ import os, hashlib, httpx, threading, time
 app = FastAPI(title="DataNode DFS")
 
 # ── Configuración ─────────────────────────────────────────────────────────────
-# Windows (desarrollo local): antes de correr, ejecutar en terminal:
 #   set NODE_ID=datanode-1
 #   set NODE_PORT=5001
 #   set NODE_ADDR=localhost:5001
