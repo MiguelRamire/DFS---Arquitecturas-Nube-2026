@@ -114,7 +114,7 @@ Resultado esperado: los tres DataNodes con `"alive": true`.
 
 Windows (PowerShell):
 ```powershell
-fsutil file createnew uploads\test_1mb.bin 1048576
+fsutil file createnew uploads/test_1mb.bin 1048576
 ```
 
 Linux / Mac:
@@ -154,21 +154,21 @@ Debe aparecer `test_1mb.bin` con su tamaño y número de bloques.
 **Descargar el archivo:**
 
 ```bash
-docker exec -it dfs-client python client.py get test_1mb.bin /downloads/test_1mb_recuperado.bin
+docker exec -it dfs-client python client.py get test_1mb.bin /uploads/downloads/test_1mb_recuperado.bin
 ```
 
 **Verificar que el archivo descargado es idéntico al original (MD5):**
 
 Windows (PowerShell):
 ```powershell
-certutil -hashfile uploads\test_1mb.bin MD5
-certutil -hashfile downloads\test_1mb_recuperado.bin MD5
+certutil -hashfile uploads/test_1mb.bin MD5
+certutil -hashfile uploads/downloads/test_1mb_recuperado.bin MD5
 ```
 
 Linux / Mac:
 ```bash
 md5sum uploads/test_1mb.bin
-md5sum downloads/test_1mb_recuperado.bin
+md5sum uploads/downloads/test_1mb_recuperado.bin
 ```
 
 Los dos hashes deben ser exactamente iguales. Si coinciden, la integridad está garantizada.
@@ -200,11 +200,17 @@ curl http://localhost:5000/datanodes/status
 **Intentar descargar el archivo con el nodo caído:**
 
 ```bash
-docker exec -it dfs-client python client.py get test_1mb.bin /downloads/test_failover.bin
+docker exec -it dfs-client python client.py get test_1mb.bin /uploads/downloads/test_failover.bin
 ```
-
 El archivo sigue siendo accesible gracias a la réplica en los otros DataNodes.
 Verificar integridad nuevamente con MD5 — debe coincidir.
+
+**Verificación de integridad**
+
+```bash
+certutil -hashfile uploads/test_1mb.bin MD5
+certutil -hashfile uploads/downloads/test_failover.bin MD5
+```
 
 **Restaurar el DataNode:**
 
@@ -222,7 +228,7 @@ Después de unos segundos vuelve a aparecer como `"alive": true`.
 
 Windows (PowerShell):
 ```powershell
-fsutil file createnew uploads\test_200mb.bin 209715200
+fsutil file createnew uploads/test_200mb.bin 209715200
 ```
 
 Linux / Mac:
@@ -241,28 +247,19 @@ El sistema lo divide automáticamente en múltiples bloques de 64 MB y los distr
 **Descargar y verificar integridad:**
 
 ```bash
-docker exec -it dfs-client python client.py get test_200mb.bin /downloads/test_200mb_recuperado.bin
+docker exec -it dfs-client python client.py get test_200mb.bin /uploads/downloads/test_200mb_recuperado.bin
 ```
 
 Windows:
 ```powershell
-certutil -hashfile uploads\test_200mb.bin MD5
-certutil -hashfile downloads\test_200mb_recuperado.bin MD5
+certutil -hashfile uploads/test_200mb.bin MD5
+certutil -hashfile uploads/downloads/test_200mb_recuperado.bin MD5
 ```
+---
 
 ---
 
-### Prueba 7 — Crear y eliminar directorios
-
-```bash
-docker exec -it dfs-client python client.py mkdir documentos
-docker exec -it dfs-client python client.py ls
-docker exec -it dfs-client python client.py rmdir documentos
-```
-
----
-
-### Prueba 8 — Eliminar un archivo
+### Prueba 7 — Eliminar un archivo
 
 ```bash
 docker exec -it dfs-client python client.py rm test_1mb.bin
@@ -273,7 +270,7 @@ docker exec -it dfs-client python client.py ls
 
 ---
 
-### Prueba 9 — Ver estado del clúster desde el cliente
+### Prueba 8 — Ver estado del clúster desde el cliente
 
 ```bash
 docker exec -it dfs-client python client.py status
