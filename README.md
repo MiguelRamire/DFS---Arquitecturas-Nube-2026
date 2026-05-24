@@ -395,29 +395,11 @@ docker logs dfs-client
 
 ---
 
-## Despliegue en AWS Academy
-
-> **Sección pendiente — por completar por Juan José Ramírez Zuluaga**
-
-Esta sección describe cómo desplegar el sistema en máquinas virtuales EC2 de AWS Academy,
-de modo que los nodos se comuniquen por Internet en vez de por red local Docker.
-
-Los puntos a documentar son:
-
-- Configuración de instancias EC2 (tipo, región, AMI usada)
-- Instalación de Docker en cada VM
-- Configuración de Security Groups (puertos a abrir por nodo)
-- Variables de entorno a cambiar para apuntar a IPs públicas o privadas de la VPC
-- Comandos para levantar cada nodo en su VM correspondiente
-- Verificación de que los nodos se comunican correctamente por Internet
-
----
-
 ## Integrantes
 
 | Integrante | Componente |
 |-----------|-----------|
-| Juan Felipe Cano Noreña | NameNode + AWS |
+| Juan Felipe Cano Noreña | NameNode |
 | Miguel Ángel Ramírez Velásquez | DataNode |
 | Juan José Ramírez Zuluaga | Cliente |
 
