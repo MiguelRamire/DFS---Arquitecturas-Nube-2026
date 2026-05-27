@@ -17,7 +17,7 @@ services:
     container_name: namenode
     hostname: namenode
     ports:
-      - "5000:5000"
+      - "5050:5000"
     volumes:
       - namenode_data:/data
     environment:

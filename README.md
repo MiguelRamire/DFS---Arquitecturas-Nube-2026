@@ -429,4 +429,4 @@ Para agregar usuarios, editar el diccionario `USERS` en `namenode/namenode.py`.
 ## Repositorio y gestión de tareas
 
 - Tablero Trello: [enlace al tablero]
-- Repositorio GitHub: [enlace al repo]
+- Repositorio GitHub: [enlace al repo].
