@@ -18,6 +18,28 @@ y un cliente CLI completo.
 | **Cliente** | CLI para interactuar con el DFS (`login`, `put`, `get`, `ls`, `rm`, `mkdir`, `rmdir`, `status`) |
 | **Docker Compose** | Orquesta todo el sistema con un solo comando |
 
+
+## Arquitectura del Client
+
+El cliente representa el punto de entrada al sistema de archivos distribuido. Su función principal es recibir las solicitudes del usuario, comunicarse con el NameNode para obtener información sobre la ubicación de archivos y posteriormente interactuar con los DataNodes para realizar operaciones de lectura y escritura.
+
+### Responsabilidades
+
+- Enviar solicitudes al sistema distribuido
+- Comunicarse inicialmente con el NameNode
+- Leer y escribir información en DataNodes
+- Actuar como interfaz entre usuario y DFS
+
+### Flujo básico
+
+Usuario  
+↓  
+Cliente  
+↓  
+NameNode  
+↓  
+DataNodes  
+
 ---
 
 ## Requisitos
